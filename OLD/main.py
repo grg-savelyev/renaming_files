@@ -1,6 +1,5 @@
 import os
 import glob
-import re
 
 
 def rename_files(data, path) -> str:
@@ -24,37 +23,26 @@ def creates_filenames(txt_files) -> dict:
     data = {}
     for txt_file in txt_files:
         old_name = os.path.basename(txt_file)
-        item, characteristic, total_codes = None, None, 0  # новое имя файла — артикул, характеристика, всего qr-кодов
+        item, characteristic, total_codes = 0, '', 0  # новое имя файла — артикул, характеристика, всего qr-кодов
+        char_flag = True  # характеристика, флаг перебора
+        line_counter = float('inf')  # счет строк — пока не найден артикул, счетчик = бесконечность
 
         with open(txt_file, 'r', encoding='utf-8') as file:
             for line in file.readlines():
                 line = line.strip()
+                if line.isdigit() and len(line) == 5 and char_flag:  # первое условие — артикул
+                    item = line
+                    line_counter = 10
+                elif line_counter > 0:
+                    line_counter -= 1
+                elif line_counter == 0 and char_flag:  # хар-ка на n строке после артикула
+                    characteristic = line
+                    char_flag = False  # отключение поиска хар-ки
 
-                # поиск артикула
-                pattern = r'Артикул:\s+(\d+)'
-                match = re.search(pattern, line)
-                if match:
-                    if not item in (None, item):
-                        raise ValueError(f'Найдены разные артикула в {txt_file}')
-                    item = match.group(1).replace(' / ', '_')
-
-                # поиск характеристики
-                pattern = r'[а-я]+ / [a-z]+, \d{2}(?=\s)'
-                match = re.search(pattern, line)
-                if match:
-                    if not characteristic in (None, characteristic):
-                        raise ValueError(f'Найдены разные характеристики в {txt_file}')
-                    characteristic = match.group(0).replace(' / ', '_')
-
-                # подсчет кодов
-                pattern = r'0469\d{10}(?!\(21\))'
-                match = re.search(pattern, line)
-                if match:
+                if '(01)04' in line and '(21)' in line and len(line) == 35:  # подсчет кодов
                     total_codes += 1
-
-        if not total_codes:
-            raise ValueError("ШК не найдены")
-        data[old_name.rstrip('.txt')] = f'{item}, {characteristic} - {total_codes}'
+        if total_codes > 0:  # если встречается txt без qr-кода, то имя файла не меняется
+            data[old_name.rstrip('.txt')] = f'{item}, {characteristic} - {total_codes}'
     return data
 
 
@@ -63,14 +51,17 @@ def collect_txt_files(path) -> list:
     return glob.glob(os.path.join(path, '*.txt'))
 
 
-def main():
+def input_path() -> str:
     print('Укажите путь к папке для обработки:')
-    folder_path = r'C:\Users\Lenovo\Desktop\КМ артикула 86575, Xiamen Tengfei Imp. and Exp. Co., Ltd'
+    folder_path = input()
     print('Запуск обработки.\n')
+    return folder_path
+
+
+def main():
+    folder_path = input_path()
     txt_files = collect_txt_files(folder_path)
     data = creates_filenames(txt_files)
-    print(txt_files)
-    print(data)
     print(rename_files(data, folder_path))
 
 
